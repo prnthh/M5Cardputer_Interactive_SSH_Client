@@ -7,6 +7,7 @@ Original project from https://github.com/fernandofatech/M5Cardputer-SSHClient
 
 ## How to use
 A: Download the .ino file and flash it with youfavorite tool
+
 B: Use the M5Launcher and download the .bin file and put it in the MicroSD card
 
 ## Planned features
