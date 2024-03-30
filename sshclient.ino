@@ -3,21 +3,19 @@
 #include "libssh_esp32.h"
 #include <libssh/libssh.h>
 
-const char* ssid = "Your_SSID"; // Replace with your WiFi SSID
-const char* password = "Your_Password"; // Replace with your WiFi password
-
-// SSH server configuration
-const char* ssh_host = "192.168.0.188"; // Replace with your SSH server address
-const char* ssh_user = "user"; // Replace with your SSH username
-const char* ssh_password = "password"; // Replace with your SSH password
+const char* ssid = "";
+const char* password = "";
+const char* ssh_host = "";
+const char* ssh_user = "";
+const char* ssh_password = "";
 
 // M5Cardputer setup
 M5Canvas canvas(&M5Cardputer.Display);
-String commandBuffer = "> ";
+String commandBuffer = "";
 int cursorY = 0;
 const int lineHeight = 32;
 unsigned long lastKeyPressMillis = 0;
-const unsigned long debounceDelay = 200; // Adjust debounce delay as needed
+const unsigned long debounceDelay = 150; // Adjust debounce delay as needed
 
 // Function declarations
 ssh_session connect_ssh(const char *host, const char *user, int verbosity);
@@ -30,11 +28,35 @@ void setup() {
     M5Cardputer.Display.setRotation(1);
     M5Cardputer.Display.setTextSize(1); // Set text size
 
+    // Prompt WiFi setup
+    M5Cardputer.Display.print("WiFi setup");
+
+    M5Cardputer.Display.print("\nSSID: ");
+    readInputFromKeyboard(ssid);
+
+    M5Cardputer.Display.print("\nPassword: ");
+    readInputFromKeyboard(password);
+
+    Serial.println(ssid);
+    Serial.println(password); 
+
     // Connect to WiFi
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
     }
+
+    // Prompt SSH setup
+    M5Cardputer.Display.print("\nSSH setup ");
+
+    M5Cardputer.Display.print("\nHost: ");
+    readInputFromKeyboard(ssh_host);
+
+    M5Cardputer.Display.print("\nUsername: ");
+    readInputFromKeyboard(ssh_user);
+
+    M5Cardputer.Display.print("\nPassword: ");
+    readInputFromKeyboard(ssh_password);
 
     // Connect to SSH server
     TaskHandle_t sshTaskHandle = NULL;
@@ -49,6 +71,95 @@ void setup() {
 
 void loop() {
     M5Cardputer.update();
+}
+
+void readInputFromKeyboard(const char*& inputVariable) {
+    commandBuffer = "";
+    bool inputComplete = false;
+
+    while (!inputComplete) {
+        M5Cardputer.update();
+        if (M5Cardputer.Keyboard.isChange()) {
+            if (M5Cardputer.Keyboard.isPressed()) {
+                Keyboard_Class::KeysState status = M5Cardputer.Keyboard.keysState();
+
+                for (auto i : status.word) {
+                    commandBuffer += i;
+                    M5Cardputer.Display.print(i); // Display the character as it's typed
+                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
+                }
+
+                if (status.del && commandBuffer.length() > 0) {
+                    commandBuffer.remove(commandBuffer.length() - 1);
+                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
+                    M5Cardputer.Display.print(" "); // Print a space to erase the last character
+                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
+                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
+                }
+
+                if (status.enter) {
+                    inputComplete = true;
+                }
+            }
+        }
+
+        // Check if the cursor has reached the bottom of the display
+        if (cursorY > M5Cardputer.Display.height() - lineHeight) {
+            // Scroll the display up by one line
+            M5Cardputer.Display.scroll(0, -lineHeight);
+
+            // Reset the cursor to the new line position
+            cursorY -= lineHeight;
+            M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX(), cursorY);
+        }
+    }
+
+    char* inputBuffer = new char[commandBuffer.length() + 1];
+    strcpy(inputBuffer, commandBuffer.c_str());
+    inputBuffer[commandBuffer.length()] = '\0'; // Add null terminator
+    inputVariable = inputBuffer;
+    commandBuffer = "";
+}
+
+void handleKeyboardInput(bool& inputComplete) {
+    if (M5Cardputer.Keyboard.isChange()) {
+        if (M5Cardputer.Keyboard.isPressed()) {
+            unsigned long currentMillis = millis();
+            if (currentMillis - lastKeyPressMillis >= debounceDelay) {
+                Keyboard_Class::KeysState status = M5Cardputer.Keyboard.keysState();
+
+                for (auto i : status.word) {
+                    commandBuffer += i;
+                    M5Cardputer.Display.print(i); // Display the character as it's typed
+                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
+                }
+
+                if (status.del && commandBuffer.length() > 0) {
+                    commandBuffer.remove(commandBuffer.length() - 1);
+                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
+                    M5Cardputer.Display.print(" "); // Print a space to erase the last character
+                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
+                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
+                }
+
+                if (status.enter) {
+                    inputComplete = true;
+                }
+
+                lastKeyPressMillis = currentMillis;
+            }
+        }
+    }
+
+    // Check if the cursor has reached the bottom of the display
+    if (cursorY > M5Cardputer.Display.height() - lineHeight) {
+        // Scroll the display up by one line
+        M5Cardputer.Display.scroll(0, -lineHeight);
+
+        // Reset the cursor to the new line position
+        cursorY -= lineHeight;
+        M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX(), cursorY);
+    }
 }
 
 void sshTask(void *pvParameters) {
