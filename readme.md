@@ -5,7 +5,7 @@ Stole and modified a SSH client for the M5Cardputer so you can connect to WiFi a
 
 Original project from https://github.com/fernandofatech/M5Cardputer-SSHClient
 
-![IMG_3531]([https://github.com/fernandofatech/M5Cardputer-SSHClient/assets/39699305/52fccfc4-7b77-4ea0-9ccf-d27374df7629](https://github.com/SUB0PT1MAL/InteractiveSetup-M5Cardputer-SSHClient/blob/c7227a89ba3f95affeddf9d4b6e017ffd56fb9ec/IMG_20240330_015103.jpg))
+![IMG_3531](IMG_20240330_015103.jpg)
 
 ## How to use
 A: Download the .ino file and flash it with your favorite tool
