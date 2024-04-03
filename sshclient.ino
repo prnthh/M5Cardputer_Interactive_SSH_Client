@@ -121,47 +121,6 @@ void readInputFromKeyboard(const char*& inputVariable) {
     commandBuffer = "";
 }
 
-void handleKeyboardInput(bool& inputComplete) {
-    if (M5Cardputer.Keyboard.isChange()) {
-        if (M5Cardputer.Keyboard.isPressed()) {
-            unsigned long currentMillis = millis();
-            if (currentMillis - lastKeyPressMillis >= debounceDelay) {
-                Keyboard_Class::KeysState status = M5Cardputer.Keyboard.keysState();
-
-                for (auto i : status.word) {
-                    commandBuffer += i;
-                    M5Cardputer.Display.print(i); // Display the character as it's typed
-                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
-                }
-
-                if (status.del && commandBuffer.length() > 0) {
-                    commandBuffer.remove(commandBuffer.length() - 1);
-                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
-                    M5Cardputer.Display.print(" "); // Print a space to erase the last character
-                    M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX() - 6, M5Cardputer.Display.getCursorY());
-                    cursorY = M5Cardputer.Display.getCursorY(); // Update cursor Y position
-                }
-
-                if (status.enter) {
-                    inputComplete = true;
-                }
-
-                lastKeyPressMillis = currentMillis;
-            }
-        }
-    }
-
-    // Check if the cursor has reached the bottom of the display
-    if (cursorY > M5Cardputer.Display.height() - lineHeight) {
-        // Scroll the display up by one line
-        M5Cardputer.Display.scroll(0, -lineHeight);
-
-        // Reset the cursor to the new line position
-        cursorY -= lineHeight;
-        M5Cardputer.Display.setCursor(M5Cardputer.Display.getCursorX(), cursorY);
-    }
-}
-
 void sshTask(void *pvParameters) {
     ssh_session my_ssh_session = connect_ssh(ssh_host, ssh_user, SSH_LOG_PROTOCOL);
     if (my_ssh_session == NULL) {
