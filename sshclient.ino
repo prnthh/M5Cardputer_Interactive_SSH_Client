@@ -1,8 +1,25 @@
 #include <WiFi.h>
 #include <M5Cardputer.h>
+#include <WireGuard-ESP32.h>
+#include <SD.h>
+#include <FS.h>
 #include "libssh_esp32.h"
 #include <libssh/libssh.h>
 
+#define BGCOLOR TFT_BLACK
+#define FGCOLOR TFT_WHITE
+
+// WireGuard variables
+char private_key[45];
+IPAddress local_ip;
+char public_key[45];
+char endpoint_address[16];
+int endpoint_port = 31337;
+static constexpr const uint32_t UPDATE_INTERVAL_MS = 5000;
+static WireGuard wg;
+bool useWireGuard = false;
+
+// SSH variables
 const char* ssid = "";
 const char* password = "";
 const char* ssh_host = "";
@@ -15,12 +32,7 @@ String commandBuffer = "";
 int cursorY = 0;
 const int lineHeight = 32;
 unsigned long lastKeyPressMillis = 0;
-const unsigned long debounceDelay = 150; // Adjust debounce delay as needed
-
-// Function declarations
-ssh_session connect_ssh(const char *host, const char *user, int verbosity);
-int authenticate_console(ssh_session session, const char *password);
-void sshTask(void *pvParameters);
+const unsigned long debounceDelay = 150;
 
 void setup() {
     auto cfg = M5.config();
@@ -44,6 +56,32 @@ void setup() {
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
+    }
+
+    // Prompt for WireGuard setup
+    M5Cardputer.Display.print("\nUse WireGuard VPN? (Y/N) WIP: ");
+    String useWireGuardInput = "";
+    while (useWireGuardInput != "Y" && useWireGuardInput != "y" && useWireGuardInput != "N" && useWireGuardInput != "n") {
+        M5Cardputer.update();
+        if (M5Cardputer.Keyboard.isChange()) {
+            if (M5Cardputer.Keyboard.isPressed()) {
+                Keyboard_Class::KeysState status = M5Cardputer.Keyboard.keysState();
+                for (auto i : status.word) {
+                    useWireGuardInput += i;
+                    M5Cardputer.Display.print(i);
+                }
+                if (status.enter) {
+                    break;
+                }
+            }
+        }
+    }
+
+    useWireGuard = (useWireGuardInput == "Y" || useWireGuardInput == "y");
+
+    if (useWireGuard) {
+        read_and_parse_file();
+        wg_setup();
     }
 
     // Prompt SSH setup
@@ -71,6 +109,14 @@ void setup() {
 
 void loop() {
     M5Cardputer.update();
+
+    if (useWireGuard) {
+        wg_loop();
+    }
+}
+
+void wg_loop() {
+
 }
 
 void readInputFromKeyboard(const char*& inputVariable) {
@@ -119,6 +165,37 @@ void readInputFromKeyboard(const char*& inputVariable) {
     inputBuffer[commandBuffer.length()] = '\0'; // Add null terminator
     inputVariable = inputBuffer;
     commandBuffer = "";
+}
+
+ssh_session connect_ssh(const char *host, const char *user, int verbosity) {
+    ssh_session session = ssh_new();
+    if (session == NULL) {
+        Serial.println("Failed to create SSH session");
+        return NULL;
+    }
+
+    ssh_options_set(session, SSH_OPTIONS_HOST, host);
+    ssh_options_set(session, SSH_OPTIONS_USER, user);
+    ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
+
+    if (ssh_connect(session) != SSH_OK) {
+        Serial.print("Error connecting to host: ");
+        Serial.println(ssh_get_error(session));
+        ssh_free(session);
+        return NULL;
+    }
+
+    return session;
+}
+
+int authenticate_console(ssh_session session, const char *password) {
+    int rc = ssh_userauth_password(session, NULL, password);
+    if (rc != SSH_AUTH_SUCCESS) {
+        Serial.print("Error authenticating with password: ");
+        Serial.println(ssh_get_error(session));
+        return rc;
+    }
+    return SSH_OK;
 }
 
 void sshTask(void *pvParameters) {
@@ -245,33 +322,124 @@ void sshTask(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-ssh_session connect_ssh(const char *host, const char *user, int verbosity) {
-    ssh_session session = ssh_new();
-    if (session == NULL) {
-        Serial.println("Failed to create SSH session");
-        return NULL;
-    }
+void wg_setup()
+{
+    read_and_parse_file();
 
-    ssh_options_set(session, SSH_OPTIONS_HOST, host);
-    ssh_options_set(session, SSH_OPTIONS_USER, user);
-    ssh_options_set(session, SSH_OPTIONS_LOG_VERBOSITY, &verbosity);
+    Serial.println("Adjusting system time...");
+    configTime(9 * 60 * 60, 0, "ntp.jst.mfeed.ad.jp", "ntp.nict.jp", "time.google.com");
+    M5Cardputer.Display.clear();
+    M5Cardputer.Display.setCursor(0, 0);
 
-    if (ssh_connect(session) != SSH_OK) {
-        Serial.print("Error connecting to host: ");
-        Serial.println(ssh_get_error(session));
-        ssh_free(session);
-        return NULL;
-    }
+    Serial.println("Connected. Initializing WireGuard...");
+    M5Cardputer.Display.println("Connecting to\nwireguard...");
+    wg.begin(
+        local_ip,
+        private_key,
+        endpoint_address,
+        public_key,
+        endpoint_port);
+    Serial.println(local_ip);
+    Serial.println(private_key);
+    Serial.println(endpoint_address);
+    Serial.println(public_key);
+    Serial.println(endpoint_port);
 
-    return session;
+    M5Cardputer.Display.clear();
+    M5Cardputer.Display.setCursor(0, 0);
+
+    M5Cardputer.Display.setTextColor(GREEN, BGCOLOR);
+    M5Cardputer.Display.println("Connected!");
+    M5Cardputer.Display.setTextColor(FGCOLOR, BGCOLOR);
+    M5Cardputer.Display.print("IP on tunnel:");
+    M5Cardputer.Display.setTextColor(WHITE, BGCOLOR);
+    M5Cardputer.Display.println(local_ip);
+    M5Cardputer.Display.setTextColor(FGCOLOR, BGCOLOR);
+    Serial.println(local_ip);
+
 }
 
-int authenticate_console(ssh_session session, const char *password) {
-    int rc = ssh_userauth_password(session, NULL, password);
-    if (rc != SSH_AUTH_SUCCESS) {
-        Serial.print("Error authenticating with password: ");
-        Serial.println(ssh_get_error(session));
-        return rc;
+void read_and_parse_file() {
+  if (!SD.begin(SS)) {
+    Serial.println("Failed to initialize SD card");
+    return;
+  }
+
+  File file = SD.open("/wg.conf");
+  if (!file) {
+        M5Cardputer.Display.clear();
+    M5Cardputer.Display.setCursor(0, 0);
+
+    M5Cardputer.Display.setTextColor(RED, BGCOLOR);
+    Serial.println("Failed to open file");
+    M5Cardputer.Display.println("No wg.conf file\nfound on\nthe SD");
+    M5Cardputer.Display.setTextColor(FGCOLOR, BGCOLOR);
+    delay(60000);
+    return;
+  }
+
+  Serial.println("Readed config file!");
+
+  Serial.println("Found file!");
+  parse_config_file(file);
+}
+
+void parse_config_file(File configFile) {
+  String line;
+
+  while (configFile.available()) {
+    line = configFile.readStringUntil('\n');
+    Serial.println("==========PRINTING LINE");
+    Serial.println(line);
+    line.trim();
+
+    if (line.startsWith("[Interface]") || line.isEmpty()) {
+      // Skip [Interface] or empty lines
+      continue;
+    } else if (line.startsWith("PrivateKey")) {
+      line.remove(0, line.indexOf('=') + 1);
+      line.trim();
+      Serial.println("Private Key: " + line);
+      strncpy(private_key, line.c_str(), sizeof(private_key) - 1);
+      private_key[sizeof(private_key) - 1] = '\0'; // Ensure null-terminated
+    } else if (line.startsWith("Address")) {
+      line.remove(0, line.indexOf('=') + 1);
+      line.trim();
+      Serial.println("Local IP: " + line);
+      int slashIndex = line.indexOf('/');
+      
+      if (slashIndex != -1) {
+        Serial.println("~~~~~~~~~~~~");
+        Serial.println(line.substring(0, slashIndex));
+        local_ip.fromString(line.substring(0, slashIndex));
+      }
+
+    } else if (line.startsWith("[Peer]")) {
+      // Handle [Peer] section
+    } else if (line.startsWith("PublicKey")) {
+      line.remove(0, line.indexOf('=') + 1);
+      line.trim();
+      Serial.println("Public Key: " + line);
+      strncpy(public_key, line.c_str(), sizeof(public_key) - 1);
+      public_key[sizeof(public_key) - 1] = '\0'; // Ensure null-terminated
+    } else if (line.startsWith("Endpoint")) {
+      //Serial.println("~~~~~~~~~~~endpoint");
+      //Serial.println(line);
+      line.remove(0, line.indexOf('=') + 1);
+      line.trim();
+      int colonIndex = line.indexOf(':');
+
+      if (colonIndex != -1) {
+        //Serial.println("Endpoint Line: " + line);
+        strncpy(endpoint_address, line.substring(0, colonIndex).c_str(), sizeof(endpoint_address) - 1);
+        endpoint_address[sizeof(endpoint_address) - 1] = '\0'; // Ensure null-terminated
+        Serial.println("Endpoint Address: " + String(endpoint_address));
+        endpoint_port = line.substring(colonIndex + 1).toInt();
+        Serial.println("Endpoint Port: " + String(endpoint_port));
+      }
     }
-    return SSH_OK;
+  }
+
+  Serial.println("Closing file!");
+  configFile.close();
 }
