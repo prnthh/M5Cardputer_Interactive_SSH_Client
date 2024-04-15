@@ -17,11 +17,9 @@ Every time it boots it will ask for SSID and its password, and if the connection
 Put the Wireguard .conf file on the root of the sdcard and name it "wg.conf"
 
 ## WIP features
-WireGuard VPN support
-
-The code implementation is mostly done, but i'm having issues making the WireGuard-ESP32 library work, it keeps looping on attempting the handshake. Trying the official demo for the library I observe the same behaviour.
-
-I will investigate this once I have more time.
-
+#### WireGuard VPN support:
+  - The code implementation is mostly done, but i'm having issues making the WireGuard-ESP32 library work, it keeps looping on attempting the handshake. Trying the official demo for the library I observe the same behaviour. I will investigate this once I have more time.
+#### Save Wifi and SSH credentials:
+  - Save the wifi and ssh credentials on to a file on the SD card that the program can creaet and use if requested.
 ## FYI
 I just get tangled on those silly projects from time to time and i drop them immediately. Dont expect any future support.
