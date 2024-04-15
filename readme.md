@@ -12,7 +12,7 @@ A: Download the .ino file and flash it with your favorite tool
 
 B: Use the M5Launcher and download the .bin file and put it in the MicroSD card
 
-Every time it boots it will ask for SSID and its password, and if the connection is successful it will then ask if you want to use WireGuard VPN (WIP) for SSH host, username and password.
+Every time it boots it will ask for SSID and its password, and if the connection is successful it will then ask if you want to use WireGuard VPN (WIP) and finally for the  SSH host, username and password.
 
 Put the Wireguard .conf file on the root of the sdcard and name it "wg.conf"
 
