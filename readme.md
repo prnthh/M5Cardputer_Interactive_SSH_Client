@@ -1,7 +1,7 @@
 # Interactive SSH client with in-device WiFi and SSH connection setup
 
 ## Overview
-Stole and modified a SSH client for the M5Cardputer so you can connect to WiFi and different SSH hosts dinamically from the cardputer itself with support for saving and loading the WiFi and SSH credentiasl from a file.
+Forked a SSH client for the M5Cardputer so you can connect to WiFi and different SSH hosts dinamically from the cardputer itself with support for saving and loading the WiFi and SSH credentiasl from a file.
 
 Original project from https://github.com/fernandofatech/M5Cardputer-SSHClient
 
