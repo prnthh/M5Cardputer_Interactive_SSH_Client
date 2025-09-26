@@ -515,14 +515,20 @@ void saveWiFiCredentials(const char* ssid, const char* password) {
         return;
     }
     Serial.println("SD card initialized successfully.");
-
+    // Create /sshclient/ directory if it doesn't exist
+    if (!SD.exists("/sshclient")) {
+        if (!SD.mkdir("/sshclient")) {
+            M5Cardputer.Display.println("\nFailed to create /sshclient directory.");
+            return;
+        }
+        Serial.println("/sshclient directory created.");
+    }
     File file = SD.open(WIFI_CRED_FILE, FILE_WRITE);
     if (!file) {
         M5Cardputer.Display.println("\nFailed to open file for writing WiFi credentials.");
         return;
     }
     Serial.println("File opened successfully for writing WiFi credentials.");
-
     file.println(ssid);
     file.print(password);
     file.close();
